@@ -91,9 +91,9 @@ def main():
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     nz = 100  # Size of z latent vector (i.e., size of generator input)
-    lr = 0.9
+    lr = 0.0000125
     beta1 = 0.5
-    batch_size = 64
+    batch_size = 32
 
     # Create the generator and discriminator
     netG = StyleGenerator(nz).to(device)
@@ -121,6 +121,20 @@ def main():
     # Create the dataloader
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=2)
 
+    # Pretrain Discriminator
+    print("Pretraining Discriminator...")
+    for epoch in range(2):
+        for i, data in enumerate(dataloader, 0):
+            netD.zero_grad()
+            real_cpu = data[0].to(device)
+            b_size = real_cpu.size(0)
+            label = torch.full((b_size,), 1, dtype=torch.float, device=device)
+            output = netD(real_cpu).view(-1)
+            errD_real = criterion(output, label)
+            errD_real.backward()
+            optimizerD.step()
+            if i % 50 == 0:
+                print(f'Pretraining Discriminator: [{epoch}/{num_epochs}][{i}/{len(dataloader)}] Loss_D: {errD_real:.4f}')
 
     print("Starting Training Loop...")
     for epoch in range(num_epochs):
@@ -130,9 +144,7 @@ def main():
             real_cpu = data[0].to(device)
             b_size = real_cpu.size(0)
             label = torch.full((b_size,), 1, dtype=torch.float, device=device)
-
-            print("Input size to discriminator:", real_cpu.size())
-            output = netD(real_cpu)
+            output = netD(real_cpu).view(-1)
 
             errD_real = criterion(output, label)
             errD_real.backward()
@@ -140,7 +152,7 @@ def main():
             noise = torch.randn(b_size, nz, device=device)
             fake = netG(noise)
             label.fill_(0)
-            output = netD(fake.detach())
+            output = netD(fake.detach()).view(-1)
             errD_fake = criterion(output, label)
             errD_fake.backward()
             optimizerD.step()
@@ -148,7 +160,7 @@ def main():
             # Update Generator: maximize log(D(G(z)))
             netG.zero_grad()
             label.fill_(1)
-            output = netD(fake)
+            output = netD(fake).view(-1)
             errG = criterion(output, label)
             errG.backward()
             optimizerG.step()

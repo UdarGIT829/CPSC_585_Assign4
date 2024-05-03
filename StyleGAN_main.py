@@ -43,16 +43,16 @@ class StyleGenerator(nn.Module):
             AdaIN(512, 512),
             nn.Conv2d(512, 256, 3, padding=1),
             nn.Upsample(scale_factor=2, mode='nearest'),  # Upsample to 16x16
-            AdaIN(256, 256),
+            AdaIN(512, 256),
             nn.Conv2d(256, 128, 3, padding=1),
             nn.Upsample(scale_factor=2, mode='nearest'),  # Upsample to 32x32
-            AdaIN(128, 128),
+            AdaIN(512, 128),
             nn.Conv2d(128, 64, 3, padding=1),
             nn.Upsample(scale_factor=2, mode='nearest'),  # Upsample to 64x64
-            AdaIN(64, 64),
+            AdaIN(512, 64),
             nn.Conv2d(64, num_channels, 3, padding=1),
             nn.Tanh()
-        ])
+        ])  
 
     def forward(self, z):
         w = self.mapping_network(z)
@@ -91,7 +91,7 @@ def main():
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     nz = 100  # Size of z latent vector (i.e., size of generator input)
-    lr = 0.002
+    lr = 0.9
     beta1 = 0.5
     batch_size = 64
 

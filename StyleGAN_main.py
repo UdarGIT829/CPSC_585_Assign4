@@ -6,6 +6,7 @@ import torchvision.datasets as dset
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
+
 class MappingNetwork(nn.Module):
     def __init__(self, input_dim, feature_dim, num_layers=8):
         super(MappingNetwork, self).__init__()
@@ -34,34 +35,86 @@ class AdaIN(nn.Module):
 class StyleGenerator(nn.Module):
     def __init__(self, nz, num_channels=3):
         super(StyleGenerator, self).__init__()
-        self.initial = nn.Parameter(torch.randn(1, 512, 4, 4))  # Starting from a learned constant
         self.mapping_network = MappingNetwork(nz, 512)
-        self.style_blocks = nn.ModuleList([
-            AdaIN(512, 512),
-            nn.Conv2d(512, 512, 3, padding=1),
-            nn.Upsample(scale_factor=2, mode='nearest'),  # Upsample to 8x8
-            AdaIN(512, 512),
-            nn.Conv2d(512, 256, 3, padding=1),
-            nn.Upsample(scale_factor=2, mode='nearest'),  # Upsample to 16x16
-            AdaIN(512, 256),
-            nn.Conv2d(256, 128, 3, padding=1),
-            nn.Upsample(scale_factor=2, mode='nearest'),  # Upsample to 32x32
-            AdaIN(512, 128),
-            nn.Conv2d(128, 64, 3, padding=1),
-            nn.Upsample(scale_factor=2, mode='nearest'),  # Upsample to 64x64
-            AdaIN(512, 64),
-            nn.Conv2d(64, num_channels, 3, padding=1),
+        self.initial = nn.Parameter(torch.randn(1, 512, 4, 4))     # Randomize initial tensor
+        self.style_blocks  = nn.ModuleList([
+
+            # Deconvolve tensor
+            AdaIN(512, 512),  
+            nn.ConvTranspose2d(512, 512, 4, stride=2, padding=1),  # 8x8
+            nn.SiLU(inplace=True),
+            AdaIN(512, 512), 
+            nn.ConvTranspose2d(512, 512, 4, stride=2, padding=1),  # 16x16
+            nn.SiLU(inplace=True),
+            AdaIN(512, 512),  
+            nn.ConvTranspose2d(512, 512, 4, stride=2, padding=1),  # 32x32
+            nn.SiLU(inplace=True),
+            AdaIN(512, 512),  
+            nn.ConvTranspose2d(512, 512, 4, stride=2, padding=1),  # 64x64
+            nn.SiLU(inplace=True),
+
+            # Convolve tensor
+            AdaIN(512, 512), 
+            nn.Conv2d(512, 512, 4, stride=2, padding=1),           # 32x32
+            nn.SiLU(inplace=True),
+            AdaIN(512, 512),   
+            nn.Conv2d(512, 512, 4, stride=2, padding=1),           # 16x16
+            nn.SiLU(inplace=True),
+            AdaIN(512, 512),  
+            nn.Conv2d(512, 512, 4, stride=2, padding=1),           # 8x8
+            nn.SiLU(inplace=True),
+
+            # Deconvolve tensor
+            AdaIN(512, 512),  
+            nn.ConvTranspose2d(512, 256, 4, stride=2, padding=1),  # 16x16
+            nn.SiLU(inplace=True),
+            AdaIN(512, 256), 
+            nn.ConvTranspose2d(256, 256, 4, stride=2, padding=1),  # 32x32
+            nn.SiLU(inplace=True),
+            AdaIN(512, 256),  
+            nn.ConvTranspose2d(256, 256, 4, stride=2, padding=1),  # 64x64
+            nn.SiLU(inplace=True),
+
+            # Reconvolve tensor
+            AdaIN(512, 256),  
+            nn.Conv2d(256, 256, 4, stride=2, padding=1),           # 32x32
+            nn.SiLU(inplace=True),
+            AdaIN(512, 256),  
+            nn.Conv2d(256, 256, 4, stride=2, padding=1),           # 16x16
+            nn.SiLU(inplace=True),
+
+            # Deconvolve tensor
+            AdaIN(512, 256),  
+            nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1),  # 32x32
+            nn.SiLU(inplace=True),
+            AdaIN(512, 128),  
+            nn.ConvTranspose2d(128, 128, 4, stride=2, padding=1),  # 64x64
+            nn.SiLU(inplace=True),
+
+            # Reconvolve tensor
+            AdaIN(512, 128),  
+            nn.Conv2d(128, 128, 4, stride=2, padding=1),           # 32x32
+            nn.SiLU(inplace=True),
+            
+            # Deconvolve tensor
+            AdaIN(512, 128),  
+            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),   # 64x64
+            nn.SiLU(inplace=True),
+
+            # Final Image
+            AdaIN(512, 64),  
+            nn.Conv2d(64, num_channels, 3, stride=1, padding=1),   # 64x64
             nn.Tanh()
-        ])  
+        ])
 
     def forward(self, z):
-        w = self.mapping_network(z)
-        x = self.initial.repeat(z.size(0), 1, 1, 1)  # Repeat for batch size
-        for layer in self.style_blocks:
-            if isinstance(layer, AdaIN):
-                x = layer(x, w)
+        style_codes = self.mapping_network(z)
+        x = self.initial.expand(z.size(0), -1, -1, -1)
+        for style_block in self.style_blocks:
+            if isinstance(style_block, AdaIN):
+                x = style_block(x, style_codes)
             else:
-                x = layer(x)
+                x = style_block(x)
         return x
 
 class Discriminator(nn.Module):
@@ -69,42 +122,47 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.main = nn.Sequential(
             # input is 3 x 64 x 64
-            nn.Conv2d(3, 64, 4, 2, 1, bias=False),  # Output size: 64 x 32 x 32
+            nn.Conv2d(3, 64, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(64),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(64, 128, 4, 2, 1, bias=False),  # Output size: 128 x 16 x 16
+            nn.Conv2d(64, 128, 4, 2, 1, bias=False),
             nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(128, 256, 4, 2, 1, bias=False),  # Output size: 256 x 8 x 8
+            nn.Conv2d(128, 256, 4, 2, 1, bias=False),
             nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(256, 512, 4, 2, 1, bias=False),  # Output size: 512 x 4 x 4
+            nn.Conv2d(256, 512, 4, 2, 1, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(512, 1, 4, 1, 0, bias=False),  # Output size: 1 x 1 x 1
+            nn.Conv2d(512, 1, 4, 1, 0, bias=False),
             nn.Sigmoid()
         )
 
     def forward(self, input):
-        return self.main(input).view(-1, 1).squeeze(1)
-    
+        return self.main(input)
 def main():
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    nz = 100  # Size of z latent vector (i.e., size of generator input)
-    lr = 0.0000125
+    print(f'Using device: {device}')
+    nz = 512 # Size of z latent vector (i.e., size of generator input)
+    lrD = 0.0001
+    lrG = 0.0001
     beta1 = 0.5
-    batch_size = 32
+    batch_size = 32         
+
+    criterion = nn.BCELoss()
 
     # Create the generator and discriminator
     netG = StyleGenerator(nz).to(device)
     netD = Discriminator().to(device)
 
     # Setup Adam optimizers for both G and D
-    optimizerD = optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
-    optimizerG = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
+    optimizerD = optim.Adam(netD.parameters(), lr = lrD, betas=(beta1, 0.999))
+    optimizerG = optim.Adam(netG.parameters(), lr = lrG, betas=(beta1, 0.999))
 
-    # Loss function
-    criterion = nn.BCELoss()
+    # optimizerD = optim.Adadelta(netD.parameters(), lr = 0.001, rho=0.1)
+    # optimizerG = optim.Adadelta(netG.parameters(), lr = 0.001, rho=0.)
+
     # Transformations
     transform = transforms.Compose([
         transforms.Resize(64),  # Ensuring the images are resized to 64x64
@@ -113,65 +171,45 @@ def main():
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
 
-    # Training code continues...
-    num_epochs = 10
-    # Load dataset
+    num_epochs = 200
     dataset = dset.CIFAR10(root='./data', download=True, transform=transform)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
-    # Create the dataloader
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=2)
-
-    # Pretrain Discriminator
-    print("Pretraining Discriminator...")
-    for epoch in range(2):
-        for i, data in enumerate(dataloader, 0):
-            netD.zero_grad()
-            real_cpu = data[0].to(device)
-            b_size = real_cpu.size(0)
-            label = torch.full((b_size,), 1, dtype=torch.float, device=device)
-            output = netD(real_cpu).view(-1)
-            errD_real = criterion(output, label)
-            errD_real.backward()
-            optimizerD.step()
-            if i % 50 == 0:
-                print(f'Pretraining Discriminator: [{epoch}/{num_epochs}][{i}/{len(dataloader)}] Loss_D: {errD_real:.4f}')
-
-    print("Starting Training Loop...")
     for epoch in range(num_epochs):
         for i, data in enumerate(dataloader, 0):
-            # Update Discriminator: maximize log(D(x)) + log(1 - D(G(z)))
             netD.zero_grad()
             real_cpu = data[0].to(device)
-            b_size = real_cpu.size(0)
-            label = torch.full((b_size,), 1, dtype=torch.float, device=device)
-            output = netD(real_cpu).view(-1)
+            noise = torch.randn(batch_size, nz, device=device)
 
-            errD_real = criterion(output, label)
-            errD_real.backward()
-
-            noise = torch.randn(b_size, nz, device=device)
+            # Update Discriminator: maximize log(D(x)) + log(1 - D(G(z)))
+            output_real = netD(real_cpu).view(-1)
+            # Use label smoothing for real labels
+            label_real = torch.full(tuple(output_real.size()), 0.9, device=device, dtype=torch.float)
+            errD_real = criterion(output_real, label_real)
             fake = netG(noise)
-            label.fill_(0)
-            output = netD(fake.detach()).view(-1)
-            errD_fake = criterion(output, label)
-            errD_fake.backward()
+            output_fake = netD(fake.detach()).view(-1)
+            # Use label smoothing for fake labels
+            label_fake = torch.full(tuple(output_fake.size()), 0.1, device=device, dtype=torch.float)
+            errD_fake = criterion(output_fake, label_fake)
+            errD = errD_real + errD_fake
+            errD.backward()
             optimizerD.step()
+
 
             # Update Generator: maximize log(D(G(z)))
             netG.zero_grad()
-            label.fill_(1)
             output = netD(fake).view(-1)
-            errG = criterion(output, label)
+            # Use label smoothing for real labels
+            label_real = torch.full(tuple(output.size()), 0.9, device=device, dtype=torch.float)
+            errG = criterion(output, label_real)
             errG.backward()
             optimizerG.step()
 
-            if i % 50 == 0:
-                print(f'[{epoch}/{num_epochs}][{i}/{len(dataloader)}] Loss_D: {errD_real + errD_fake:.4f} Loss_G: {errG:.4f}')
 
-            if (i % 500 == 0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
-                with torch.no_grad():
-                    fake = netG(torch.randn(64, nz, device=device)).detach().cpu()
-                save_image(fake.data, f'output/fake_samples_epoch_{epoch}_{i}.png', normalize=True)
+            if i % 250 == 0 or i == len(dataloader)-1:
+                print(f'\t[{epoch+1}/{num_epochs}][{i+1}/{len(dataloader)}] Loss_D: {errD:.4f} Loss_G: {errG:.4f}\n')
+                fake = netG(torch.randn(64, nz, device=device)).detach().cpu()
+                save_image(fake.data, f'output/fake_samples_styleGAN.png', normalize=True)
 
 if __name__ == '__main__':
     main()

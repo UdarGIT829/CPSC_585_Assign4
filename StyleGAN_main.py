@@ -40,70 +40,40 @@ class StyleGenerator(nn.Module):
         self.style_blocks  = nn.ModuleList([
 
             # Deconvolve tensor
-            AdaIN(512, 512),  
             nn.ConvTranspose2d(512, 512, 4, stride=2, padding=1),  # 8x8
             nn.SiLU(inplace=True),
             AdaIN(512, 512), 
-            nn.ConvTranspose2d(512, 512, 4, stride=2, padding=1),  # 16x16
+            nn.Conv2d(512, 512, 3, stride=1, padding=1),  # 8x8
             nn.SiLU(inplace=True),
-            AdaIN(512, 512),  
-            nn.ConvTranspose2d(512, 512, 4, stride=2, padding=1),  # 32x32
+            AdaIN(512, 512),
+            nn.Conv2d(512, 512, 3, stride=1, padding=1),  # 8x8
             nn.SiLU(inplace=True),
-            AdaIN(512, 512),  
-            nn.ConvTranspose2d(512, 512, 4, stride=2, padding=1),  # 64x64
-            nn.SiLU(inplace=True),
-
-            # Convolve tensor
-            AdaIN(512, 512), 
-            nn.Conv2d(512, 512, 4, stride=2, padding=1),           # 32x32
-            nn.SiLU(inplace=True),
-            AdaIN(512, 512),   
-            nn.Conv2d(512, 512, 4, stride=2, padding=1),           # 16x16
-            nn.SiLU(inplace=True),
-            AdaIN(512, 512),  
-            nn.Conv2d(512, 512, 4, stride=2, padding=1),           # 8x8
-            nn.SiLU(inplace=True),
-
-            # Deconvolve tensor
-            AdaIN(512, 512),  
+            AdaIN(512, 512),
             nn.ConvTranspose2d(512, 256, 4, stride=2, padding=1),  # 16x16
             nn.SiLU(inplace=True),
-            AdaIN(512, 256), 
-            nn.ConvTranspose2d(256, 256, 4, stride=2, padding=1),  # 32x32
+            AdaIN(512, 256),
+            nn.Conv2d(256, 256, 3, stride=1, padding=1),  # 16x16
             nn.SiLU(inplace=True),
-            AdaIN(512, 256),  
-            nn.ConvTranspose2d(256, 256, 4, stride=2, padding=1),  # 64x64
+            AdaIN(512, 256),
+            nn.Conv2d(256, 256, 3, stride=1, padding=1),  # 16x16
             nn.SiLU(inplace=True),
-
-            # Reconvolve tensor
-            AdaIN(512, 256),  
-            nn.Conv2d(256, 256, 4, stride=2, padding=1),           # 32x32
-            nn.SiLU(inplace=True),
-            AdaIN(512, 256),  
-            nn.Conv2d(256, 256, 4, stride=2, padding=1),           # 16x16
-            nn.SiLU(inplace=True),
-
-            # Deconvolve tensor
-            AdaIN(512, 256),  
+            AdaIN(512, 256),
             nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1),  # 32x32
             nn.SiLU(inplace=True),
-            AdaIN(512, 128),  
-            nn.ConvTranspose2d(128, 128, 4, stride=2, padding=1),  # 64x64
+            AdaIN(512, 128),
+            nn.Conv2d(128, 128, 3, stride=1, padding=1),  # 32x32
             nn.SiLU(inplace=True),
-
-            # Reconvolve tensor
-            AdaIN(512, 128),  
-            nn.Conv2d(128, 128, 4, stride=2, padding=1),           # 32x32
+            AdaIN(512, 128),
+            nn.Conv2d(128, 128, 3, stride=1, padding=1),  # 32x32
             nn.SiLU(inplace=True),
-            
-            # Deconvolve tensor
             AdaIN(512, 128),  
-            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),   # 64x64
+            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),  # 64x64
             nn.SiLU(inplace=True),
-
-            # Final Image
-            AdaIN(512, 64),  
-            nn.Conv2d(64, num_channels, 3, stride=1, padding=1),   # 64x64
+            AdaIN(512, 64),
+            nn.Conv2d(64, 64, 3, stride=1, padding=1),  # 64x64
+            nn.SiLU(inplace=True),
+            AdaIN(512, 64),
+            nn.Conv2d(64, num_channels, 3, stride=1, padding=1),  # 64x64
             nn.Tanh()
         ])
 
@@ -144,9 +114,9 @@ def main():
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f'Using device: {device}')
-    nz = 512 # Size of z latent vector (i.e., size of generator input)
-    lrD = 0.0001
-    lrG = 0.0001
+    nz = 100 # Size of z latent vector (i.e., size of generator input)
+    lrD = 0.00015
+    lrG = 0.00015
     beta1 = 0.5
     batch_size = 32         
 

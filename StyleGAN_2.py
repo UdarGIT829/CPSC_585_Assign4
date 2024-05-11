@@ -1,3 +1,37 @@
+import os
+import requests
+
+pickles = {
+        'ffhq-256':     'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl',
+        'ffhq-512':     'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/transfer-learning-source-nets/ffhq-res512-mirror-stylegan2-noaug.pkl',
+        'ffhq-1024':    'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/transfer-learning-source-nets/ffhq-res1024-mirror-stylegan2-noaug.pkl',
+    }
+
+def download_file(url, destination):
+    """Download a file from a URL to a destination."""
+    response = requests.get(url, stream=True)
+    if response.status_code == 200:
+        with open(destination, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+    else:
+        print("Failed to download file: status code", response.status_code)
+
+# Path where the .pkl file should be located
+
+selected_pkl = 'ffhq-256'
+pkl_path = f'{selected_pkl}.pkl'
+
+# URL to the .pkl file
+pkl_url = pickles[selected_pkl]
+
+# Check if the file exists, and download it if it doesn't
+if not os.path.exists(pkl_path):
+    print(f"{pkl_path} not found. Downloading from {pkl_url}...")
+    download_file(pkl_url, pkl_path)
+else:
+    print(f"{pkl_path} already exists. No download needed.")
+
 import sys
 import torch
 import pickle

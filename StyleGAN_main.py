@@ -6,6 +6,8 @@ import torchvision.datasets as dset
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
+import time
+
 
 class MappingNetwork(nn.Module):
     def __init__(self, input_dim, feature_dim, num_layers=8):
@@ -145,7 +147,17 @@ def main():
     dataset = dset.CIFAR10(root='./data', download=True, transform=transform)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
+
+    total_time = 0.0
+    time_per_epoch = []
+
+    start_time = None
+    end_time = None
+    duration = None
+
     for epoch in range(num_epochs):
+        start_time = time.time()
+        print(f"Processing epoch #{epoch}")
         for i, data in enumerate(dataloader, 0):
             netD.zero_grad()
             real_cpu = data[0].to(device)
@@ -180,6 +192,14 @@ def main():
                 print(f'\t[{epoch+1}/{num_epochs}][{i+1}/{len(dataloader)}] Loss_D: {errD:.4f} Loss_G: {errG:.4f}\n')
                 fake = netG(torch.randn(64, nz, device=device)).detach().cpu()
                 save_image(fake.data, f'output/fake_samples_styleGAN.png', normalize=True)
+
+        end_time = time.time()
+        duration = end_time - start_time
+        time_per_epoch.append(duration)
+        total_time += duration
+        avg_time = total_time/len(time_per_epoch)
+
+        print(f"Completed epoch #{epoch}\tTime: {round(duration,2)} seconds\nAvg s/epoch: {round(avg_time,2)}")
 
 if __name__ == '__main__':
     main()

@@ -199,7 +199,7 @@ def main():
         total_time += duration
         avg_time = total_time/len(time_per_epoch)
 
-        print(f"Completed epoch #{epoch}\tTime: {round(duration,2)} seconds\nAvg s/epoch: {round(avg_time,2)}")
+        print(f"Completed epoch #{epoch}\tTime: {round(duration,2)} seconds\nAvg s/epoch: {round(avg_time,2)}\tTotal time: {round(total_time,2)}")
 
 if __name__ == '__main__':
     main()

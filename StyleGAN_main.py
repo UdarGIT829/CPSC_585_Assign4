@@ -41,41 +41,49 @@ class StyleGenerator(nn.Module):
         self.initial = nn.Parameter(torch.randn(1, 512, 4, 4))     # Randomize initial tensor
         self.style_blocks  = nn.ModuleList([
 
-            # Deconvolve tensor
-            nn.ConvTranspose2d(512, 512, 4, stride=2, padding=1),  # 8x8
-            nn.SiLU(inplace=True),
-            AdaIN(512, 512), 
-            nn.Conv2d(512, 512, 3, stride=1, padding=1),  # 8x8
-            nn.SiLU(inplace=True),
+            nn.Conv2d(512, 512, 3, stride = 1, padding=1),  # 4x4
+            nn.ReLU(inplace=True),
             AdaIN(512, 512),
-            nn.Conv2d(512, 512, 3, stride=1, padding=1),  # 8x8
-            nn.SiLU(inplace=True),
-            AdaIN(512, 512),
-            nn.ConvTranspose2d(512, 256, 4, stride=2, padding=1),  # 16x16
-            nn.SiLU(inplace=True),
+            nn.ConvTranspose2d(512, 512, 4, 2, 1),
+
+            nn.Conv2d(512, 256, 3, stride = 1, padding=1),  
+            nn.ReLU(inplace=True),
             AdaIN(512, 256),
-            nn.Conv2d(256, 256, 3, stride=1, padding=1),  # 16x16
-            nn.SiLU(inplace=True),
+            nn.Conv2d(256, 256, 3, stride = 1, padding=1),  
+            nn.ReLU(inplace=True),
             AdaIN(512, 256),
-            nn.Conv2d(256, 256, 3, stride=1, padding=1),  # 16x16
-            nn.SiLU(inplace=True),
-            AdaIN(512, 256),
-            nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1),  # 32x32
-            nn.SiLU(inplace=True),
+            nn.ConvTranspose2d(256, 256, 4, 2, 1), 
+    
+            nn.Conv2d(256, 128, 3, stride = 1, padding=1),
+            nn.ReLU(inplace=True),
             AdaIN(512, 128),
-            nn.Conv2d(128, 128, 3, stride=1, padding=1),  # 32x32
-            nn.SiLU(inplace=True),
+            nn.Conv2d(128, 128, 3, stride = 1, padding=1),
+            nn.ReLU(inplace=True),
             AdaIN(512, 128),
-            nn.Conv2d(128, 128, 3, stride=1, padding=1),  # 32x32
-            nn.SiLU(inplace=True),
-            AdaIN(512, 128),  
-            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),  # 64x64
-            nn.SiLU(inplace=True),
+            nn.Conv2d(128, 128, 3, stride = 1, padding=1),
+            nn.ReLU(inplace=True),
+            AdaIN(512, 128),
+            nn.Conv2d(128, 128, 3, stride = 1, padding=1),
+            nn.ReLU(inplace=True),
+            AdaIN(512, 128),
+            nn.ConvTranspose2d(128, 128, 4, 2, 1),
+
+            nn.Conv2d(128, 64, 3, stride = 1, padding=1),
+            nn.ReLU(inplace=True),
             AdaIN(512, 64),
-            nn.Conv2d(64, 64, 3, stride=1, padding=1),  # 64x64
-            nn.SiLU(inplace=True),
+            nn.Conv2d(64, 64, 3, stride = 1, padding=1),
+            nn.ReLU(inplace=True),
             AdaIN(512, 64),
-            nn.Conv2d(64, num_channels, 3, stride=1, padding=1),  # 64x64
+            nn.Conv2d(64, 64, 3, stride = 1, padding=1),
+            nn.ReLU(inplace=True),
+            AdaIN(512, 64),
+            nn.Conv2d(64, 64, 3, stride = 1, padding=1),
+            nn.ReLU(inplace=True),
+            AdaIN(512, 64),
+            nn.ConvTranspose2d(64, 64, 4, 2, 1),
+
+
+            nn.Conv2d(64, num_channels, 3, stride = 1, padding=1),  
             nn.Tanh()
         ])
 
@@ -117,8 +125,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f'Using device: {device}')
     nz = 100 # Size of z latent vector (i.e., size of generator input)
-    lrD = 0.00015
-    lrG = 0.00015
+    lrD = 0.00025
+    lrG = 0.00025
     beta1 = 0.5
     batch_size = 32         
 

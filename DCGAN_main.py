@@ -170,6 +170,37 @@ def main():
 
             iters += 1
 
+        #testing loop, get accuracy of DC-GAN dsicriminator
+
+    testloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+    
+    correct = 0
+    total = 0
+    print('Testing Discriminator Accuracy...')
+    with torch.no_grad():
+        for data in testloader:
+            images, _ = data
+            images = images.to(device)
+            b_size = images.size(0)
+            # Forward pass real images through D
+            output = netD(images).view(-1)
+            # Count correct predictions (real images)
+            correct += ((output > 0.5).sum().item())
+
+            # Generate batch of latent vectors
+            noise = torch.randn(b_size, nz, 1, 1, device=device)
+            # Generate fake image batch with G
+            fake = netG(noise)
+            # Forward pass fake images through D
+            output = netD(fake.detach()).view(-1)
+            # Count correct predictions (fake images)
+            correct += ((output <= 0.5).sum().item())
+
+            total += images.size(0) + noise.size(0)
+        
+        print(f'Final Accuracy: {100 * correct / total}%')
+
+
     # Save training generator images
     save_image(fake, f'output/fake_samples_final.png')
 
